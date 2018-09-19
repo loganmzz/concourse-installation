@@ -1,0 +1,23 @@
+service_container='concourse-s3'
+service_image='minio/minio:RELEASE.2018-08-02T23-11-36Z'
+
+function do_create() {
+    docker run -d \
+        --name "${service_container}" \
+        -e 'MINIO_ACCESS_KEY=minio-access-key' \
+        -e 'MINIO_SECRET_KEY=minio-secret-key' \
+        -p '9000' \
+        --network "${service_network}" --network-alias='s3.concourse.local' \
+        -l 'project=concourse' \
+        -l 'traefik.enable=true' -l 'traefik.port=9000' \
+        "${service_image}" \
+        server '/data'
+
+
+    sleep 2
+    docker run --rm \
+        -e 'MC_HOSTS_s3=http://minio-access-key:minio-secret-key@s3.concourse.local:9000' \
+        --network "${service_network}" \
+        -l 'project=concourse' \
+        minio/mc:RELEASE.2018-08-02T17-39-44Z mb s3/concourse
+}

@@ -1,0 +1,14 @@
+service_container='concourse-postgres'
+service_image='postgres:9.6'
+
+function do_create() {
+    docker run -d \
+        --name "${service_container}" \
+        -e 'POSTGRES_DB=concourse' \
+        -e 'POSTGRES_USER=concourse' \
+        -e 'POSTGRES_PASSWORD=changeme' \
+        -e 'PGDATA=/database' \
+        -l 'project=concourse' \
+        --network "${service_network}" --network-alias='db.concourse.local' \
+        "${service_image}"
+}

@@ -1,0 +1,88 @@
+service_container='concourse-vault'
+service_image='vault:0.10.4'
+
+function do_post_clear() {
+    echo "      ¤  Remove init configuration"
+    rm "${basedir}/vault-init.json"
+    echo "      ¤  Remove 'logs' volume"
+    docker volume rm concourse-vault-logs
+    echo "      ¤  Remove 'file' volume"
+    docker volume rm concourse-vault-file
+    echo "      ¤  Remove 'config' volume"
+    docker volume rm concourse-vault-config
+}
+
+function do_create() {
+    echo "      ¤  Create 'config' volume"
+    docker volume create --label 'project=concourse' concourse-vault-config
+    echo "      ¤  Create 'file' volume"
+    docker volume create --label 'project=concourse' concourse-vault-file
+    echo "      ¤  Create 'logs' volume"
+    docker volume create --label 'project=concourse' concourse-vault-logs
+
+    echo "      ¤  Init 'config' volume"
+    docker run --name concourse-vault-init-config --rm -i \
+        -v concourse-vault-config:/vault/config \
+        -l 'project=concourse' \
+        buildpack-deps:stretch-scm tee /vault/config/local.hcl <<EOF
+storage "file" {
+    path = "/vault/file"
+}
+listener "tcp" {
+    address = "0.0.0.0:8200"
+    tls_disable = 1
+}
+disable_mlock = true
+ui = true
+EOF
+
+    echo "      ¤  Create container"
+    docker run --name "${service_container}" -d \
+        -e 'VAULT_TOKEN=vault-root-token' \
+        -e 'VAULT_ADDR=http://localhost:8200' \
+        -v 'concourse-vault-config:/vault/config' \
+        -v 'concourse-vault-file:/vault/file' \
+        -v 'concourse-vault-logs:/vault/logs' \
+        -p 8200 \
+        --network "${service_network}" --network-alias='vault.concourse.local' \
+        -l 'project=concourse' \
+        -l 'traefik.enable=true' -l 'traefik.port=8200' \
+        "${service_image}" server
+
+    echo "      ¤  Init vault"
+    docker exec 'concourse-vault' vault operator init -key-shares 1 -key-threshold 1 -format json | tee "${basedir}/vault-init.json"
+
+    do_post_start
+
+    echo "      ¤  Create additional root token"
+    docker exec -e "VAULT_TOKEN=$(jq -r '.root_token' < vault-init.json)" 'concourse-vault' \
+        vault token create \
+        -display-name="Concourse token" -id="vault-root-token" -policy="root" -format="json"
+
+    echo "      ¤  Create Concourse path"
+    docker exec 'concourse-vault' \
+        vault secrets enable \
+        -path '/concourse' \
+        -description 'Concourse secrets' \
+        generic
+
+    echo "      ¤  Create Concourse policy"
+    docker exec -i 'concourse-vault' \
+        vault policy write 'policy-concourse' - <<EOF
+path "concourse/*" {
+    capabilities = ["read", "list"]
+}
+EOF
+
+    echo "      ¤  Create Concourse token"
+    docker exec 'concourse-vault' \
+        vault token create \
+        -display-name 'Concourse token' \
+        -id 'concourse-vault-token' \
+        -policy 'policy-concourse'
+}
+
+do_post_start() {
+    echo "      ¤  Unseal vault"
+    docker exec 'concourse-vault' vault operator unseal "$(jq -r '.unseal_keys_b64[0]' < vault-init.json)"
+}

@@ -1,0 +1,13 @@
+service_container='concourse-worker'
+service_image='concourse/concourse:4.0.0'
+
+do_create() {
+    docker run --name "${service_container}" -d \
+        --privileged \
+        -e 'CONCOURSE_TSA_HOST=web.concourse.local:2222' \
+        -e 'CONCOURSE_GARDEN_ALLOW_HOST_ACCESS=true' \
+        -v concourse-worker-keys:/concourse-keys \
+        --network "${service_network}" --network-alias='worker.concourse.local' \
+        -l 'project=concourse' \
+        "${service_image}" worker
+}

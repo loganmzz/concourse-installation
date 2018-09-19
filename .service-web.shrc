@@ -1,0 +1,51 @@
+service_container='concourse'
+service_image='concourse/concourse:4.0.0'
+
+do_post_clear() {
+    echo "      ¤  Remove web-keys volume"
+    docker volume rm concourse-web-keys
+    echo "      ¤  Remove worker-keys volume"
+    docker volume rm concourse-worker-keys
+}
+
+do_create() {
+    echo "      ¤  Create web-keys volume"
+    docker volume create --label 'project=concourse' concourse-web-keys
+    echo "      ¤  Create worker-keys volume"
+    docker volume create --label 'project=concourse' concourse-worker-keys
+
+    echo "      ¤  Create SSH keys"
+    docker run --name concourse-keygen --rm -i \
+        -v concourse-web-keys:/keys/web \
+        -v concourse-worker-keys:/keys/worker \
+        -l 'project=concourse' \
+        buildpack-deps:stretch-scm <<EOF
+yes | ssh-keygen -t rsa -f /keys/web/tsa_host_key -N ''
+yes | ssh-keygen -t rsa -f /keys/web/session_signing_key -N ''
+
+yes | ssh-keygen -t rsa -f /keys/worker/worker_key -N ''
+
+cp /keys/worker/worker_key.pub /keys/web/authorized_worker_keys
+cp /keys/web/tsa_host_key.pub /keys/worker
+EOF
+
+    docker run --name "${service_container}" -d \
+        -e 'CONCOURSE_ADD_LOCAL_USER=admin:admin' \
+        -e 'CONCOURSE_MAIN_TEAM_ALLOW_ALL_USERS=true' \
+        -e 'CONCOURSE_EXTERNAL_URL=http://concourse.dev.localhost' \
+        -e 'CONCOURSE_POSTGRES_HOST=db.concourse.local' \
+        -e 'CONCOURSE_POSTGRES_USER=concourse' \
+        -e 'CONCOURSE_POSTGRES_PASSWORD=changeme' \
+        -e 'CONCOURSE_POSTGRES_DATABASE=concourse' \
+        -e 'CONCOURSE_VAULT_URL=http://vault.concourse.local:8200' \
+        -e 'CONCOURSE_VAULT_CLIENT_TOKEN=concourse-vault-token' \
+        -e 'CONCOURSE_BIND_PORT=80' \
+        -e 'CONCOURSE_PEER_URL=http://localhost' \
+        -h 'concourse.dev.localhost' \
+        -v concourse-web-keys:/concourse-keys \
+        -p 80 \
+        --network "${service_network}" --network-alias='web.concourse.local' \
+        -l 'project=concourse' \
+        -l 'traefik.enable=true' -l 'traefik.port=80' \
+        "${service_image}" web
+}
