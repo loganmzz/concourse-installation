@@ -1,5 +1,5 @@
 service_container='concourse'
-service_image='concourse/concourse:4.0.0'
+service_image='concourse/concourse:4.2.1'
 
 do_post_clear() {
     echo "      ¤  Remove web-keys volume"
