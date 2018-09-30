@@ -15,9 +15,21 @@ function do_create() {
 
 
     sleep 2
-    docker run --rm \
+    do_exec_mc mb s3/concourse
+}
+
+function do_exec_mc() {
+    docker run --rm -i \
         -e 'MC_HOSTS_s3=http://minio-access-key:minio-secret-key@s3.concourse.local:9000' \
         --network "${service_network}" \
         -l 'project=concourse' \
-        minio/mc:RELEASE.2018-08-02T17-39-44Z mb s3/concourse
+        minio/mc:RELEASE.2018-08-02T17-39-44Z "$@"
+}
+
+function do_exec_mc_write() {
+    [[ "$#" -eq 1 ]] || {
+        echo "Expected exactly one argument (path)"
+    }
+    local path="$1"; shift
+    do_exec_mc pipe "s3/concourse/${path}"
 }

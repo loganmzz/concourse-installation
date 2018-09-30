@@ -211,6 +211,12 @@ function __do_cmd_vault() {
     docker exec -i 'concourse-vault' vault "$@"
 }
 
+function __do_cmd_s3_write() {
+    service=s3
+    __load_service_definition
+    do_exec_mc_write "$@"
+}
+
 function __do_cmd_help() {
     cat <<EOF
 Helps managing Concourse environment
@@ -226,6 +232,8 @@ Commands:
   - get-fly: Download fly
 
   - vault: Execute a vault command
+
+  - s3-write <path>: Write from STDIN to target "path"
 
 EOF
 }
