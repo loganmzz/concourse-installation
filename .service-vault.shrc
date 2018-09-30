@@ -48,6 +48,7 @@ EOF
         -l 'project=concourse' \
         -l 'traefik.enable=true' -l 'traefik.port=8200' \
         "${service_image}" server
+    sleep 1
 
     echo "      ¤  Init vault"
     docker exec 'concourse-vault' vault operator init -key-shares 1 -key-threshold 1 -format json | tee "${basedir}/vault-init.json"
@@ -83,6 +84,7 @@ EOF
 }
 
 do_post_start() {
+    sleep 2
     echo "      ¤  Unseal vault"
     docker exec 'concourse-vault' vault operator unseal "$(jq -r '.unseal_keys_b64[0]' < vault-init.json)"
 }
