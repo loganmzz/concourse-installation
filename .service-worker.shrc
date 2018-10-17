@@ -1,7 +1,15 @@
 service_container='concourse-worker'
 service_image='concourse/concourse:4.2.1'
 
+#Optional
+docker_registry_host=
+
 do_create() {
+    local service_options=()
+    [[ -z "${docker_registry_host:-}" ]] || {
+        service_options+=('-e' "CONCOURSE_GARDEN_DOCKER_REGISTRY=${docker_registry_host}" \
+                          '-e' "CONCOURSE_GARDEN_INSECURE_DOCKER_REGISTRY=${docker_registry_host}")
+    }
     docker run --name "${service_container}" -d \
         --privileged \
         -e 'CONCOURSE_TSA_HOST=web.concourse.local:2222' \
@@ -10,5 +18,6 @@ do_create() {
         -v concourse-worker-keys:/concourse-keys \
         --network "${service_network}" --network-alias='worker.concourse.local' \
         -l 'project=concourse' \
+        "${service_options[@]}" \
         "${service_image}" worker
 }
