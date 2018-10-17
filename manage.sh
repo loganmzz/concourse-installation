@@ -167,6 +167,24 @@ function __start_service() {
     esac
 }
 
+function __do_cmd_stop() {
+    local opt_services=("$@")
+    [[ "${#opt_services[@]}" == 0 ]] && opt_services=("${all_services[@]}")
+
+    local errors=()
+    for service in "${opt_services[@]}"; do
+        __load_service_definition 2>/dev/null || {
+            errors+=("'${service}'")
+            continue
+        }
+        echo "  ¤  Stop container ${service_container}"
+        docker stop "${service_container}"
+    done
+    [[ "${#errors[@]}" > 0 ]] && {
+        echo "Unsupported services: ${errors[@]}" >&2
+    }
+}
+
 function __do_cmd_status() {
     local opt_services=("$@")
     [[ "${#opt_services[@]}" == 0 ]] && opt_services=("${all_services[@]}")
@@ -226,6 +244,8 @@ Commands:
   - help: Displays this help message
 
   - start: Start containers in background
+
+  - stop: Stop containers
 
   - status: Print containers status
 
