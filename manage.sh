@@ -229,10 +229,10 @@ function __do_cmd_vault() {
     docker exec -i 'concourse-vault' vault "$@"
 }
 
-function __do_cmd_s3_write() {
+function __do_cmd_s3() {
     service=s3
     __load_service_definition
-    do_exec_mc_write "$@"
+    do_exec_mc_operate_file "$@"
 }
 
 function __do_cmd_help() {
@@ -253,7 +253,10 @@ Commands:
 
   - vault: Execute a vault command
 
-  - s3-write <path>: Write from STDIN to target "path"
+  - s3 ls   [options] <path>: List "path"
+       cat  [options] <path>: Print "path" content
+       pipe [options] <path>: Write from STDIN to target "path"
+       rm   [options] <path>: Remove "path"
 
 EOF
 }

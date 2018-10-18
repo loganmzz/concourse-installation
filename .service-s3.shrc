@@ -26,10 +26,22 @@ function do_exec_mc() {
         minio/mc:RELEASE.2018-08-02T17-39-44Z "$@"
 }
 
-function do_exec_mc_write() {
-    [[ "$#" -eq 1 ]] || {
-        echo "Expected exactly one argument (path)"
+function do_exec_mc_operate_file() {
+    [[ "$#" -ge 2 ]] || {
+        echo 'Expected at least two arguments' >&2; return 1
     }
+    local operation="$1"; shift
+    case "${operation}" in
+        ls|cat|pipe|rm)
+            ;;
+        *)
+            echo "Unsupported operation '${operation}'" >&2; return 1
+            ;;
+    esac
+    local operation_with_opts=("${operation}")
+    while [[ "$#" -gt 1 ]]; do
+        operation_with_opts+=("$1"); shift
+    done
     local path="$1"; shift
-    do_exec_mc pipe "s3/concourse/${path}"
+    do_exec_mc "${operation_with_opts[@]}" "s3/concourse/${path}"
 }
